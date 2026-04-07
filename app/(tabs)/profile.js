@@ -13,8 +13,6 @@ import {
 import { supabase } from "../../src/lib/supabase";
 import { useHabitStore } from "../../src/store/useHabitStore";
 
-const deleteAccount = useHabitStore((s) => s.deleteAccount);
-
 const ALL_BADGE_IDS = [
   "first_habit",
   "streak_3",
@@ -26,6 +24,7 @@ const ALL_BADGE_IDS = [
 ];
 
 export default function ProfileScreen() {
+  const deleteAccount = useHabitStore((s) => s.deleteAccount);
   const user = useHabitStore((s) => s.user);
   const stats = useHabitStore((s) => s.stats);
   const loading = useHabitStore((s) => s.loading);

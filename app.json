@@ -22,6 +22,21 @@
       }
     },
     "android": {
+      "android": {
+        "package": "com.hrnsoftware.habitflow",
+        "versionCode": 1,
+        "adaptiveIcon": {
+          "foregroundImage": "./assets/images/adaptive-icon.png",
+          "backgroundColor": "#0f0f0f"
+        },
+        "permissions": [
+          "NOTIFICATIONS",
+          "RECEIVE_BOOT_COMPLETED",
+          "VIBRATE",
+          "SCHEDULE_EXACT_ALARM",
+          "USE_EXACT_ALARM"
+        ]
+      },
       "package": "com.hrnsoftware.habitflow",
       "versionCode": 1,
       "adaptiveIcon": {
