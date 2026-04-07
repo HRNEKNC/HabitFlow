@@ -31,6 +31,34 @@ export default function ProfileScreen() {
   const userBadges = useHabitStore((s) => s.userBadges); // ✅ Yeni
 
   const [signingOut, setSigningOut] = useState(false);
+  const updateUsername = useHabitStore((s) => s.updateUsername);
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [updatingName, setUpdatingName] = useState(false);
+
+  // Eski getUsername fonksiyonunu BUNUNLA DEĞİŞTİR:
+  function getUsername() {
+    // Önce özel belirlediği bir ad var mı ona bakar, yoksa emailden üretir
+    if (user?.user_metadata?.username) return user.user_metadata.username;
+    return user?.email ? user.email.split("@")[0] : "...";
+  }
+
+  async function handleSaveUsername() {
+    if (!newName.trim()) {
+      setModalVisible(false);
+      return;
+    }
+    setUpdatingName(true);
+    try {
+      await updateUsername(newName.trim());
+      setModalVisible(false);
+      setNewName("");
+    } catch (error) {
+      Alert.alert("Hata", error.message);
+    } finally {
+      setUpdatingName(false);
+    }
+  }
 
   function handleSignOut() {
     Alert.alert("Çıkış Yap", "Hesabından çıkmak istediğine emin misin?", [
@@ -121,7 +149,21 @@ export default function ProfileScreen() {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{getInitial()}</Text>
           </View>
-          <Text style={styles.username}>{getUsername()}</Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 4,
+            }}
+          >
+            <Text style={styles.username} numberOfLines={1}>
+              {getUsername()}
+            </Text>
+            <TouchableOpacity onPress={() => setModalVisible(true)}>
+              <Ionicons name="pencil-outline" size={18} color="#6366f1" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.email}>{user?.email}</Text>
           <View style={styles.memberBadge}>
             <Ionicons name="calendar-outline" size={13} color="#555" />
@@ -264,6 +306,48 @@ export default function ProfileScreen() {
           <Text style={styles.deleteText}>Hesabımı Kalıcı Olarak Sil</Text>
         </TouchableOpacity>
       </ScrollView>
+      {/* ── Kullanıcı Adı Değiştirme Modalı ── */}
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Kullanıcı Adı Belirle</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Yeni kullanıcı adın..."
+              placeholderTextColor="#555"
+              value={newName}
+              onChangeText={setNewName}
+              autoFocus={true}
+              maxLength={20}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setModalVisible(false)}
+                disabled={updatingName}
+              >
+                <Text style={styles.modalButtonTextCancel}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSave]}
+                onPress={handleSaveUsername}
+                disabled={updatingName}
+              >
+                {updatingName ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonTextSave}>Kaydet</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -471,5 +555,64 @@ const styles = StyleSheet.create({
   deleteText: {
     color: "#ef444866",
     fontSize: 13,
+  },
+  // ✅ Modal Stilleri
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#1a1a1a",
+    width: "100%",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: "#0f0f0f",
+    color: "#fff",
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalButtonCancel: {
+    backgroundColor: "#2a2a2a",
+  },
+  modalButtonSave: {
+    backgroundColor: "#6366f1",
+  },
+  modalButtonTextCancel: {
+    color: "#aaa",
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  modalButtonTextSave: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
   },
 });

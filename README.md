@@ -1,6 +1,6 @@
 # ⚡ HabitFlow
 
-Modern, minimalist ve oyunlaştırma odaklı bir alışkanlık takip uygulaması. Kullanıcıların günlük hedeflerine ulaşmalarını teşvik eden, kişiselleştirilebilir bildirimler ve rozet sistemiyle donatılmış tam kapsamlı bir mobil deneyim.
+A modern, minimalist, and gamification-focused habit tracking app. A full-scale mobile experience equipped with customizable notifications and a badge system that encourages users to reach their daily goals.
 
 ![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Expo](https://img.shields.io/badge/Expo-1B1F23?style=for-the-badge&logo=expo&logoColor=white)
@@ -9,34 +9,34 @@ Modern, minimalist ve oyunlaştırma odaklı bir alışkanlık takip uygulaması
 
 ---
 
-## 🚀 Özellikler
+## 🚀 Features
 
-- **🔒 Güvenli Kimlik Doğrulama (Auth):** Supabase entegrasyonu ile e-posta/şifre kayıt, giriş ve şifre sıfırlama (Deep Linking).
-- **🎯 Haftalık Hedefler:** Her alışkanlık için esnek hedefler (Örn: Haftada 3 gün) ve anlık ilerleme çubukları.
-- **🏆 Oyunlaştırma (Gamification):** 3, 7 ve 30 günlük seriler (streaks) ve hedeflere ulaşıldığında kazanılan kilitli rozet sistemi.
-- **🔔 Yerel Bildirimler (Push Notifications):** Her alışkanlık için özel saatlerde çalışan, Expo Notifications destekli günlük hatırlatıcılar.
-- **⚡ Işık Hızında State Yönetimi:** Zustand ile merkezi veri yönetimi ve anlık UI güncellemeleri (Optimistic UI Updates).
-- **🛡️ Güvenli Veri Silme:** Supabase RPC (Remote Procedure Call) fonksiyonları ile güvenli ve atomik hesap/veri silme mimarisi.
-- **🌙 Karanlık Tema (Dark Mode):** Göz yormayan, modern ve şık kullanıcı arayüzü.
+- **🔒 Secure Authentication (Auth):** Supabase integration with email/password registration, login, and password reset (Deep Linking).
+- **🎯 Weekly Goals:** Flexible goals for each habit (e.g., 3 days a week) and real-time progress bars.
+- **🏆 Gamification:** 3, 7, and 30-day streaks and an unlockable badge system earned upon reaching goals.
+- **🔔 Local Push Notifications:** Daily reminders powered by Expo Notifications, running at custom times for each habit.
+- **⚡ Lightning Fast State Management:** Centralized data management and instantaneous UI updates (Optimistic UI Updates) with Zustand.
+- **🛡️ Secure Data Deletion:** Secure and atomic account/data deletion architecture via Supabase RPC (Remote Procedure Call) functions.
+- **🌙 Dark Mode:** Easy on the eyes, modern, and sleek user interface.
 
-## 🛠️ Kullanılan Teknolojiler (Tech Stack)
+## 🛠️ Tech Stack
 
 - **Frontend:** React Native, Expo SDK, Expo Router (File-based routing)
 - **Backend / BaaS:** Supabase (PostgreSQL, Auth, Edge RPC)
 - **State Management:** Zustand
-- **Bildirimler:** Expo Notifications
+- **Notifications:** Expo Notifications
 - **Storage:** AsyncStorage
 
-## 📂 Mimari Yapı
+## 📂 Architecture
 
-Proje, sürdürülebilir ve ölçeklenebilir bir klasör yapısına (Feature-Based Architecture) sahiptir:
+The project features a sustainable and scalable folder structure (Feature-Based Architecture):
 
 ```text
 HabitFlow/
-├── app/              # Expo Router tabanlı ekranlar ve navigasyon (auth, tabs)
-├── assets/           # İkonlar, splash screen ve tasarımsal materyaller
+├── app/              # Expo Router-based screens and navigation (auth, tabs)
+├── assets/           # Icons, splash screen, and design materials
 ├── src/
-│   ├── components/   # Tekrar kullanılabilir UI bileşenleri
-│   ├── lib/          # Supabase istemcisi, Bildirim ve Rozet motorları
-│   └── store/        # Zustand global state yönetimi (useHabitStore.js)
+│   ├── components/   # Reusable UI components
+│   ├── lib/          # Supabase client, Notification and Badge engines
+│   └── store/        # Zustand global state management (useHabitStore.js)
 ```

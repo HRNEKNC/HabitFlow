@@ -257,4 +257,18 @@ export const useHabitStore = create((set, get) => ({
     });
     await supabase.auth.signOut();
   },
+  // ✅ YENİ: Kullanıcı Adı Güncelleme
+  updateUsername: async (newUsername) => {
+    // Supabase Auth meta verisini güncelle
+    const { error } = await supabase.auth.updateUser({
+      data: { username: newUsername },
+    });
+    if (error) throw error;
+
+    // Local state'i hemen güncelle ki UI anında değişsin
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    set({ user: session?.user });
+  },
 }));
