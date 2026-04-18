@@ -1,207 +1,201 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { Link, useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
+  useColorScheme,
 } from "react-native";
 import { supabase } from "../../src/lib/supabase";
+import { THEME_COLORS, useHabitStore } from "../../src/store/useHabitStore";
 
 export default function RegisterScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
+  const colorScheme = useColorScheme();
+
+  const appTheme = useHabitStore((s) => s.appTheme);
+  const activeTheme = appTheme === "system" ? colorScheme || "dark" : appTheme;
+  const colors = THEME_COLORS[activeTheme];
+  const styles = useMemo(() => getDynamicStyles(colors), [colors]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ Supabase ile kayıt ol
-  async function handleRegister() {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert("Hata", "Tüm alanları doldur.");
-      return;
-    }
-
+  async function signUpWithEmail() {
     if (password !== confirmPassword) {
-      Alert.alert("Hata", "Şifreler eşleşmiyor.");
+      Alert.alert(t("error"), t("passMatchError"));
       return;
     }
-
-    if (password.length < 6) {
-      Alert.alert("Hata", "Şifre en az 6 karakter olmalı.");
-      return;
-    }
-
     setLoading(true);
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password: password,
-    });
-
+    const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
-      Alert.alert("Kayıt Hatası", error.message);
+      Alert.alert(t("error"), error.message);
     } else {
-      Alert.alert("Başarılı! 🎉", "Hesabın oluşturuldu. Giriş yapabilirsin.", [
-        { text: "Giriş Yap", onPress: () => router.replace("/(auth)/login") },
+      Alert.alert(t("registerSuccess"), t("checkEmail"), [
+        { text: "OK", onPress: () => router.replace("/(auth)/login") },
       ]);
     }
-
     setLoading(false);
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.inner}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        {/* Başlık */}
-        <View style={styles.header}>
-          <Text style={styles.emoji}>🚀</Text>
-          <Text style={styles.title}>Hesap Oluştur</Text>
-          <Text style={styles.subtitle}>
-            HabitFlow'a katıl, alışkanlık kazan.
-          </Text>
-        </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <View style={styles.iconBox}>
+                <Text style={styles.iconText}>🚀</Text>
+              </View>
+              <Text style={styles.title}>{t("registerTitle")}</Text>
+              <Text style={styles.subtitle}>{t("registerSub")}</Text>
+            </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ornek@email.com"
-            placeholderTextColor="#444"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            <View style={styles.form}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t("emailPlace")}
+                placeholderTextColor={colors.textSubtle}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
 
-          <Text style={styles.label}>Şifre</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="En az 6 karakter"
-            placeholderTextColor="#444"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+              <Text style={styles.label}>
+                {t("passPlace")
+                  .replace("Your password", "Password")
+                  .replace("Tu contraseña", "Contraseña")
+                  .replace("Şifren", "Şifre")}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSubtle}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
 
-          <Text style={styles.label}>Şifre Tekrar</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Şifreni tekrar gir"
-            placeholderTextColor="#444"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
+              <Text style={styles.label}>{t("passConfirm")}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSubtle}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+              />
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleRegister}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Kayıt Ol</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={signUpWithEmail}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>{t("registerBtn")}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-        {/* Giriş yap linki */}
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.link}>
-            Zaten hesabın var mı? <Text style={styles.linkBold}>Giriş Yap</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <View style={styles.footer}>
+              <Link href="/(auth)/login" asChild>
+                <TouchableOpacity>
+                  <Text style={styles.footerText}>{t("loginLink")}</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f0f0f",
-  },
-  inner: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 28,
-    paddingVertical: 60,
-    gap: 32,
-  },
-  header: {
-    alignItems: "center",
-    gap: 8,
-  },
-  emoji: {
-    fontSize: 52,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-  },
-  form: {
-    gap: 10,
-  },
-  label: {
-    color: "#888",
-    fontSize: 13,
-    marginBottom: 2,
-    marginLeft: 4,
-  },
-  input: {
-    backgroundColor: "#1a1a1a",
-    color: "#fff",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: "#2a2a2a",
-    marginBottom: 8,
-  },
-  button: {
-    backgroundColor: "#6366f1",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  link: {
-    color: "#555",
-    textAlign: "center",
-    fontSize: 14,
-  },
-  linkBold: {
-    color: "#6366f1",
-    fontWeight: "bold",
-  },
-});
+const getDynamicStyles = (colors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
+    header: { alignItems: "center", marginBottom: 30 },
+    iconBox: {
+      width: 72,
+      height: 72,
+      borderRadius: 20,
+      backgroundColor: colors.primary + "1A",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.primary + "33",
+    },
+    iconText: { fontSize: 36 },
+    title: {
+      color: colors.text,
+      fontSize: 32,
+      fontWeight: "900",
+      letterSpacing: -1,
+      marginBottom: 8,
+    },
+    subtitle: { color: colors.textSubtle, fontSize: 16, fontWeight: "500" },
+    form: { width: "100%" },
+    label: {
+      color: colors.textMuted,
+      fontSize: 13,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    input: {
+      backgroundColor: colors.inputBg,
+      color: colors.text,
+      borderRadius: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 20,
+      fontWeight: "500",
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      paddingVertical: 20,
+      alignItems: "center",
+      marginTop: 10,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    buttonText: {
+      color: "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+    footer: { marginTop: 30, alignItems: "center" },
+    footerText: { color: colors.textSubtle, fontSize: 15, fontWeight: "600" },
+  });

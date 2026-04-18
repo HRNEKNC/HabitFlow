@@ -1,29 +1,38 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
-import { useHabitStore } from "../../src/store/useHabitStore";
+import { THEME_COLORS, useHabitStore } from "../../src/store/useHabitStore";
 
 export default function StatsScreen() {
-  // ✅ Supabase isteği yok — store'dan okuyoruz
+  const { t, i18n } = useTranslation();
+  const colorScheme = useColorScheme();
+
   const habits = useHabitStore((s) => s.habits);
   const allLogs = useHabitStore((s) => s.allLogs);
   const loading = useHabitStore((s) => s.loading);
   const refreshing = useHabitStore((s) => s.refreshing);
   const refresh = useHabitStore((s) => s.refresh);
 
-  const [selectedDays, setSelectedDays] = useState(7);
+  const appTheme = useHabitStore((s) => s.appTheme);
+  const activeTheme = appTheme === "system" ? colorScheme || "dark" : appTheme;
+  const colors = THEME_COLORS[activeTheme];
+  const styles = useMemo(() => getDynamicStyles(colors), [colors]);
 
+  const [selectedDays, setSelectedDays] = useState(7);
   const today = new Date().toISOString().split("T")[0];
 
-  // Seçilen gün aralığına göre logları filtrele
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - selectedDays);
   const startStr = startDate.toISOString().split("T")[0];
@@ -37,19 +46,13 @@ export default function StatsScreen() {
       .filter((l) => l.habit_id === habitId)
       .map((l) => l.completed_date)
       .sort((a, b) => new Date(b) - new Date(a));
-
     if (habitLogs.length === 0) return 0;
-
     let streak = 0;
     let checkDate = new Date();
-
     for (let i = 0; i < 30; i++) {
       const dateStr = checkDate.toISOString().split("T")[0];
-      if (habitLogs.includes(dateStr)) {
-        streak++;
-      } else if (i > 0) {
-        break;
-      }
+      if (habitLogs.includes(dateStr)) streak++;
+      else if (i > 0) break;
       checkDate.setDate(checkDate.getDate() - 1);
     }
     return streak;
@@ -60,31 +63,38 @@ export default function StatsScreen() {
     return Math.round((count / selectedDays) * 100);
   }
 
-  function getLast7Days() {
+  function getThisWeek() {
     const days = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
+    const current = new Date();
+    const dayOfWeek = current.getDay() === 0 ? 6 : current.getDay() - 1;
+    const startOfWeek = new Date(current);
+    startOfWeek.setDate(current.getDate() - dayOfWeek);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
       days.push({
         date: d.toISOString().split("T")[0],
-        label: d.toLocaleDateString("tr-TR", { weekday: "short" }),
+        label: d.toLocaleDateString(i18n.language, { weekday: "short" }),
       });
     }
     return days;
   }
 
-  const last7Days = getLast7Days();
+  const thisWeek = getThisWeek();
 
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle={activeTheme === "dark" ? "light-content" : "dark-content"}
+      />
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -92,11 +102,15 @@ export default function StatsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor="#6366f1"
+            tintColor={colors.primary}
           />
         }
       >
-        <Text style={styles.title}>İstatistikler 📊</Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>
+            {t("statsTitle", { defaultValue: "İstatistikler 📊" })}
+          </Text>
+        </View>
 
         <View style={styles.daySelector}>
           {[7, 30].map((day) => (
@@ -107,6 +121,7 @@ export default function StatsScreen() {
                 selectedDays === day && styles.dayButtonActive,
               ]}
               onPress={() => setSelectedDays(day)}
+              activeOpacity={0.8}
             >
               <Text
                 style={[
@@ -114,7 +129,7 @@ export default function StatsScreen() {
                   selectedDays === day && styles.dayButtonTextActive,
                 ]}
               >
-                Son {day} Gün
+                {t("lastNDays", { defaultValue: `Son ${day} Gün`, count: day })}
               </Text>
             </TouchableOpacity>
           ))}
@@ -123,31 +138,38 @@ export default function StatsScreen() {
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNumber}>{habits.length}</Text>
-            <Text style={styles.summaryLabel}>Alışkanlık</Text>
+            <Text style={styles.summaryLabel}>{t("habit")}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNumber}>{todayLogs.length}</Text>
-            <Text style={styles.summaryLabel}>Bugün ✓</Text>
+            <Text style={styles.summaryLabel}>{t("todayDone")}</Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNumber}>{totalCompletions}</Text>
-            <Text style={styles.summaryLabel}>{selectedDays} Günde</Text>
+            <Text style={styles.summaryLabel}>
+              {t("inNDays", {
+                defaultValue: `${selectedDays} Günde`,
+                count: selectedDays,
+              })}
+            </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Son 7 Gün</Text>
+          <Text style={styles.sectionTitle}>
+            {t("thisWeekTitle", { defaultValue: "Bu Hafta" })}
+          </Text>
           <View style={styles.chartContainer}>
-            {last7Days.map(({ date, label }) => {
+            {thisWeek.map(({ date, label }) => {
               const count = allLogs.filter(
                 (l) => l.completed_date === date,
               ).length;
-              const maxHeight = 80;
+              const maxHeight = 90;
               const barHeight =
                 habits.length > 0
                   ? Math.max(
                       (count / habits.length) * maxHeight,
-                      count > 0 ? 6 : 0,
+                      count > 0 ? 8 : 0,
                     )
                   : 0;
               const isToday = date === today;
@@ -176,9 +198,17 @@ export default function StatsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Alışkanlık Detayları</Text>
+          <Text style={styles.sectionTitle}>
+            {t("habitDetails", { defaultValue: "Alışkanlık Detayları" })}
+          </Text>
           {habits.length === 0 ? (
-            <Text style={styles.emptyText}>Henüz alışkanlık eklemedin.</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>
+                {t("noHabitAdded", {
+                  defaultValue: "Henüz alışkanlık eklemedin.",
+                })}
+              </Text>
+            </View>
           ) : (
             habits.map((habit) => {
               const rate = completionRate(habit.id);
@@ -190,7 +220,7 @@ export default function StatsScreen() {
                     <View
                       style={[
                         styles.iconBox,
-                        { backgroundColor: habit.color + "22" },
+                        { backgroundColor: habit.color + "1A" },
                       ]}
                     >
                       <Text style={styles.iconText}>{habit.icon}</Text>
@@ -199,8 +229,8 @@ export default function StatsScreen() {
                       <Text style={styles.habitName}>{habit.title}</Text>
                       <Text style={styles.habitStreak}>
                         {streak > 0
-                          ? `🔥 ${streak} günlük seri`
-                          : "⚪ Seri yok"}
+                          ? `🔥 ${t("streakDays", { defaultValue: `${streak} günlük seri`, count: streak })}`
+                          : `⚪ ${t("noStreak", { defaultValue: "Seri yok" })}`}
                       </Text>
                     </View>
                     <Text style={[styles.rateText, { color: habit.color }]}>
@@ -216,7 +246,7 @@ export default function StatsScreen() {
                     />
                   </View>
                   <View style={styles.dotRow}>
-                    {last7Days.map(({ date }) => {
+                    {thisWeek.map(({ date }) => {
                       const done = allLogs.some(
                         (l) =>
                           l.habit_id === habit.id && l.completed_date === date,
@@ -244,114 +274,219 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f0f0f" },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0f0f0f",
-  },
-  scroll: { padding: 24, paddingBottom: 60 },
-  title: { color: "#fff", fontSize: 26, fontWeight: "bold", marginBottom: 20 },
-  daySelector: {
-    flexDirection: "row",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  dayButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    borderRadius: 10,
-  },
-  dayButtonActive: { backgroundColor: "#6366f1" },
-  dayButtonText: { color: "#555", fontWeight: "600", fontSize: 14 },
-  dayButtonTextActive: { color: "#fff" },
-  summaryRow: { flexDirection: "row", gap: 12, marginBottom: 28 },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: "#1a1a1a",
-    borderRadius: 14,
-    padding: 16,
-    alignItems: "center",
-  },
-  summaryNumber: { color: "#6366f1", fontSize: 28, fontWeight: "bold" },
-  summaryLabel: { color: "#555", fontSize: 12, marginTop: 4 },
-  section: { marginBottom: 28 },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 16,
-  },
-  emptyText: { color: "#555", textAlign: "center", marginTop: 12 },
-  chartContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 16,
-    height: 140,
-  },
-  barWrapper: { alignItems: "center", flex: 1 },
-  barCount: {
-    color: "#6366f1",
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 4,
-    height: 16,
-  },
-  barBg: {
-    width: 28,
-    height: 80,
-    backgroundColor: "#2a2a2a",
-    borderRadius: 8,
-    justifyContent: "flex-end",
-    overflow: "hidden",
-  },
-  barFill: { width: "100%", backgroundColor: "#6366f1", borderRadius: 8 },
-  barToday: { backgroundColor: "#ec4899" },
-  barLabel: { color: "#555", fontSize: 11, marginTop: 6 },
-  barLabelToday: { color: "#ec4899", fontWeight: "700" },
-  habitCard: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#2a2a2a",
-  },
-  habitCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  iconText: { fontSize: 20 },
-  habitInfo: { flex: 1 },
-  habitName: { color: "#fff", fontSize: 15, fontWeight: "600" },
-  habitStreak: { color: "#555", fontSize: 12, marginTop: 2 },
-  rateText: { fontSize: 18, fontWeight: "bold" },
-  progressBg: {
-    height: 6,
-    backgroundColor: "#2a2a2a",
-    borderRadius: 99,
-    overflow: "hidden",
-    marginBottom: 12,
-  },
-  progressFill: { height: 6, borderRadius: 99 },
-  dotRow: { flexDirection: "row", gap: 6 },
-  dot: { flex: 1, height: 8, borderRadius: 99 },
-  dotEmpty: { backgroundColor: "#2a2a2a" },
-});
+const getDynamicStyles = (colors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    centered: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.background,
+    },
+    scroll: { paddingHorizontal: 20, paddingBottom: 100 },
+    headerContainer: {
+      paddingTop: Platform.OS === "ios" ? 16 : 24,
+      paddingBottom: 16,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: "800",
+      letterSpacing: -0.5,
+    },
+
+    daySelector: {
+      flexDirection: "row",
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 6,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+        },
+        android: { elevation: 2 },
+      }),
+    },
+    dayButton: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      borderRadius: 12,
+    },
+    dayButtonActive: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    dayButtonText: {
+      color: colors.textSubtle,
+      fontWeight: "700",
+      fontSize: 14,
+    },
+    dayButtonTextActive: { color: "#FFF" },
+
+    summaryRow: { flexDirection: "row", gap: 12, marginBottom: 32 },
+    summaryCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 18,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+        },
+        android: { elevation: 3 },
+      }),
+    },
+    summaryNumber: {
+      color: colors.primary,
+      fontSize: 32,
+      fontWeight: "800",
+      letterSpacing: -1,
+    },
+    summaryLabel: {
+      color: colors.textSubtle,
+      fontSize: 12,
+      marginTop: 4,
+      fontWeight: "600",
+      textTransform: "uppercase",
+    },
+
+    section: { marginBottom: 32 },
+    sectionTitle: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: "800",
+      marginBottom: 16,
+      letterSpacing: -0.5,
+    },
+
+    chartContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: 20,
+      height: 160,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
+        },
+        android: { elevation: 4 },
+      }),
+    },
+    barWrapper: { alignItems: "center", flex: 1 },
+    barCount: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: "700",
+      marginBottom: 6,
+      height: 16,
+    },
+    barBg: {
+      width: 28,
+      height: 90,
+      backgroundColor: colors.inputBg,
+      borderRadius: 10,
+      justifyContent: "flex-end",
+      overflow: "hidden",
+    },
+    barFill: {
+      width: "100%",
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+    },
+    barToday: { backgroundColor: colors.accent },
+    barLabel: {
+      color: colors.textSubtle,
+      fontSize: 11,
+      marginTop: 8,
+      fontWeight: "600",
+    },
+    barLabelToday: { color: colors.accent, fontWeight: "800" },
+
+    habitCard: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: 20,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...Platform.select({
+        ios: {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.03,
+          shadowRadius: 8,
+        },
+        android: { elevation: 2 },
+      }),
+    },
+    habitCardTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    iconBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 14,
+    },
+    iconText: { fontSize: 24 },
+    habitInfo: { flex: 1 },
+    habitName: {
+      color: colors.text,
+      fontSize: 17,
+      fontWeight: "700",
+      marginBottom: 4,
+      letterSpacing: -0.3,
+    },
+    habitStreak: { color: colors.textSubtle, fontSize: 13, fontWeight: "500" },
+    rateText: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5 },
+
+    progressBg: {
+      height: 8,
+      backgroundColor: colors.inputBg,
+      borderRadius: 99,
+      overflow: "hidden",
+      marginBottom: 16,
+    },
+    progressFill: { height: 8, borderRadius: 99 },
+    dotRow: { flexDirection: "row", gap: 8 },
+    dot: { flex: 1, height: 8, borderRadius: 99 },
+    dotEmpty: { backgroundColor: colors.inputBg },
+
+    emptyCard: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: 30,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    emptyText: { color: colors.textSubtle, fontSize: 15, fontWeight: "600" },
+  });

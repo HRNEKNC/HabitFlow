@@ -1,240 +1,272 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Animated,
   Dimensions,
+  FlatList,
+  Platform,
+  SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useColorScheme,
   View,
 } from "react-native";
+import { THEME_COLORS, useHabitStore } from "../src/store/useHabitStore";
 
-// ✅ Merkezi Beyni (Zustand) doğru şekilde import ettik
-import { useHabitStore } from "../src/store/useHabitStore";
-
-const { width, height } = Dimensions.get("window");
-
-const SLIDES = [
-  {
-    id: "1",
-    emoji: "🌱",
-    title: "Alışkanlık Kazan",
-    subtitle:
-      "Küçük adımlar, büyük değişimler yaratır. Her gün bir alışkanlık ekle ve hayatını dönüştür.",
-    color: "#6366f1",
-    bg: "#6366f115",
-  },
-  {
-    id: "2",
-    emoji: "📅",
-    title: "Her Gün Takip Et",
-    subtitle:
-      "Günlük rutinini kontrol altında tut. Tamamladıklarını işaretle, serileri kır gitme.",
-    color: "#10b981",
-    bg: "#10b98115",
-  },
-  {
-    id: "3",
-    emoji: "📊",
-    title: "Gelişimini Analiz Et",
-    subtitle:
-      "Haftalık ve aylık istatistiklerle ne kadar ilerlediğini gör. Veriler seni motive eder.",
-    color: "#ec4899",
-    bg: "#ec489915",
-  },
-];
+const { width } = Dimensions.get("window");
 
 export default function OnboardingScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
-  const flatListRef = useRef(null);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const colorScheme = useColorScheme();
 
-  // ✅ Beyinden fonksiyonu başarıyla çekiyoruz
   const completeOnboarding = useHabitStore((s) => s.completeOnboarding);
+  const appTheme = useHabitStore((s) => s.appTheme);
+  const activeTheme = appTheme === "system" ? colorScheme || "dark" : appTheme;
+  const colors = THEME_COLORS[activeTheme];
+  const styles = useMemo(() => getDynamicStyles(colors), [colors]);
 
-  async function handleStart() {
-    await AsyncStorage.setItem("onboarding_completed", "true");
-    completeOnboarding(); // Beyni güncelle
-    router.replace("/(auth)/login");
-  }
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const slidesRef = useRef(null);
 
-  function goNext() {
-    if (currentIndex < SLIDES.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
-    } else {
-      handleStart();
-    }
-  }
+  // ✅ TANITIM EKRANI İÇERİKLERİ (Dil destekli ve varsayılan metinlerle korumalı)
+  const slides = [
+    {
+      id: "1",
+      icon: "⚡",
+      title: t("onb1Title", { defaultValue: "HabitFlow'a Hoş Geldin" }),
+      description: t("onb1Desc", {
+        defaultValue:
+          "Hayatını şekillendir, alışkanlıklarını lüks ve pürüzsüz bir arayüzle takip et.",
+      }),
+    },
+    {
+      id: "2",
+      icon: "🔥",
+      title: t("onb2Title", { defaultValue: "Serini Koru, Rozetleri Topla" }),
+      description: t("onb2Desc", {
+        defaultValue:
+          "Her gün hedeflerine ulaşarak zinciri kırma. Kusursuz günleri tamamla ve özel rozetlerin kilidini aç.",
+      }),
+    },
+    {
+      id: "3",
+      icon: "🛒",
+      title: t("onb3Title", { defaultValue: "Enerji ve Market Sistemi" }),
+      description: t("onb3Desc", {
+        defaultValue:
+          "Görevleri tamamla, enerji biriktir. Dünü mü unuttun? Marketten Seri Dondurucu al ve yanmaktan kurtul!",
+      }),
+    },
+  ];
 
-  function onViewableItemsChanged({ viewableItems }) {
-    if (viewableItems.length > 0) {
+  const viewableItemsChanged = useRef(({ viewableItems }) => {
+    if (viewableItems && viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
     }
-  }
-
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
   }).current;
-  const onViewableItemsChangedRef = useRef(onViewableItemsChanged);
 
-  function renderSlide({ item }) {
+  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+
+  const handleNext = async () => {
+    if (currentIndex < slides.length - 1) {
+      slidesRef.current.scrollToIndex({ index: currentIndex + 1 });
+    } else {
+      // ✅ ONBOARDING TAMAMLANDI - SİSTEME KAYDET VE GİRİŞE YÖNLENDİR
+      await AsyncStorage.setItem("onboarding_completed", "true");
+      completeOnboarding();
+      router.replace("/(auth)/login");
+    }
+  };
+
+  const handleSkip = async () => {
+    await AsyncStorage.setItem("onboarding_completed", "true");
+    completeOnboarding();
+    router.replace("/(auth)/login");
+  };
+
+  const Paginator = ({ data, scrollX }) => {
     return (
-      <View style={styles.slide}>
-        <View style={[styles.emojiCircle, { backgroundColor: item.bg }]}>
-          <Text style={styles.emoji}>{item.emoji}</Text>
-        </View>
-        <Text style={[styles.slideTitle, { color: item.color }]}>
-          {item.title}
-        </Text>
-        <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
+      <View style={styles.paginatorContainer}>
+        {data.map((_, i) => {
+          const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
+          const dotWidth = scrollX.interpolate({
+            inputRange,
+            outputRange: [10, 24, 10],
+            extrapolate: "clamp",
+          });
+          const opacity = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.3, 1, 0.3],
+            extrapolate: "clamp",
+          });
+          return (
+            <Animated.View
+              style={[
+                styles.dot,
+                { width: dotWidth, opacity, backgroundColor: colors.primary },
+              ]}
+              key={i.toString()}
+            />
+          );
+        })}
       </View>
     );
-  }
-
-  const isLast = currentIndex === SLIDES.length - 1;
+  };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.logoRow}>
-        <Text style={styles.logoEmoji}>⚡</Text>
-        <Text style={styles.logoText}>HabitFlow</Text>
-      </View>
-
-      <Animated.FlatList
-        ref={flatListRef}
-        data={SLIDES}
-        keyExtractor={(item) => item.id}
-        renderItem={renderSlide}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false },
-        )}
-        onViewableItemsChanged={onViewableItemsChangedRef.current}
-        viewabilityConfig={viewabilityConfig}
-        scrollEventThrottle={16}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar
+        barStyle={activeTheme === "dark" ? "light-content" : "dark-content"}
       />
-
-      <View style={styles.footer}>
-        <View style={styles.dotsRow}>
-          {SLIDES.map((slide, index) => {
-            const inputRange = [
-              (index - 1) * width,
-              index * width,
-              (index + 1) * width,
-            ];
-            const dotWidth = scrollX.interpolate({
-              inputRange,
-              outputRange: [8, 24, 8],
-              extrapolate: "clamp",
-            });
-            const dotColor = scrollX.interpolate({
-              inputRange,
-              outputRange: ["#2a2a2a", slide.color, "#2a2a2a"],
-              extrapolate: "clamp",
-            });
-            return (
-              <Animated.View
-                key={slide.id}
-                style={[
-                  styles.dot,
-                  { width: dotWidth, backgroundColor: dotColor },
-                ]}
-              />
-            );
-          })}
+      <View style={styles.container}>
+        {/* Atlama Butonu */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleSkip} activeOpacity={0.7}>
+            <Text style={styles.skipText}>
+              {t("skip", { defaultValue: "Atla" })}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.buttonRow}>
-          {!isLast ? (
-            <TouchableOpacity style={styles.skipButton} onPress={handleStart}>
-              <Text style={styles.skipText}>Atla</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.skipButton} />
+        <FlatList
+          data={slides}
+          renderItem={({ item }) => (
+            <View style={styles.slide}>
+              <View style={styles.iconContainer}>
+                <Text style={styles.iconText}>{item.icon}</Text>
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={styles.title}>{item.title}</Text>
+                <Text style={styles.description}>{item.description}</Text>
+              </View>
+            </View>
           )}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          pagingEnabled
+          bounces={false}
+          keyExtractor={(item) => item.id}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            {
+              useNativeDriver: false,
+            },
+          )}
+          onViewableItemsChanged={viewableItemsChanged}
+          viewabilityConfig={viewConfig}
+          ref={slidesRef}
+        />
+
+        <View style={styles.footer}>
+          <Paginator data={slides} scrollX={scrollX} />
+
           <TouchableOpacity
-            style={[
-              styles.nextButton,
-              { backgroundColor: SLIDES[currentIndex].color },
-            ]}
-            onPress={goNext}
+            style={styles.button}
+            onPress={handleNext}
+            activeOpacity={0.8}
           >
-            <Text style={styles.nextText}>
-              {isLast ? "🚀  Başla" : "İleri  →"}
+            <Text style={styles.buttonText}>
+              {currentIndex === slides.length - 1
+                ? t("getStarted", { defaultValue: "Hemen Başla" })
+                : t("next", { defaultValue: "İleri" })}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0f0f0f" },
-  logoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 64,
-    gap: 8,
-  },
-  logoEmoji: { fontSize: 24 },
-  logoText: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-  slide: {
-    width,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 40,
-    gap: 24,
-  },
-  emojiCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  emoji: { fontSize: 72 },
-  slideTitle: { fontSize: 30, fontWeight: "bold", textAlign: "center" },
-  slideSubtitle: {
-    color: "#666",
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 26,
-  },
-  footer: { paddingHorizontal: 28, paddingBottom: 52, gap: 28 },
-  dotsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-  },
-  dot: { height: 8, borderRadius: 99 },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  skipButton: { paddingVertical: 14, paddingHorizontal: 8, minWidth: 60 },
-  skipText: { color: "#444", fontSize: 15, fontWeight: "500" },
-  nextButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 99,
-    minWidth: 140,
-    alignItems: "center",
-  },
-  nextText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-});
+const getDynamicStyles = (colors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1 },
+    header: {
+      alignItems: "flex-end",
+      paddingHorizontal: 24,
+      paddingTop: Platform.OS === "android" ? 40 : 20,
+      paddingBottom: 20,
+    },
+    skipText: {
+      color: colors.textSubtle,
+      fontSize: 16,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+    },
+
+    slide: {
+      width,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 40,
+    },
+    iconContainer: {
+      width: 140,
+      height: 140,
+      borderRadius: 40,
+      backgroundColor: colors.primary + "1A",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 40,
+      borderWidth: 1,
+      borderColor: colors.primary + "33",
+    },
+    iconText: { fontSize: 72 },
+
+    textContainer: { alignItems: "center", width: "100%" },
+    title: {
+      color: colors.text,
+      fontSize: 32,
+      fontWeight: "900",
+      letterSpacing: -1,
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    description: {
+      color: colors.textSubtle,
+      fontSize: 16,
+      fontWeight: "500",
+      textAlign: "center",
+      lineHeight: 26,
+      paddingHorizontal: 10,
+    },
+
+    footer: {
+      paddingHorizontal: 24,
+      paddingBottom: Platform.OS === "ios" ? 50 : 40,
+      alignItems: "center",
+    },
+
+    paginatorContainer: {
+      flexDirection: "row",
+      height: 64,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dot: { height: 10, borderRadius: 5, marginHorizontal: 6 },
+
+    button: {
+      width: "100%",
+      backgroundColor: colors.primary,
+      paddingVertical: 20,
+      borderRadius: 16,
+      alignItems: "center",
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    buttonText: {
+      color: "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+  });

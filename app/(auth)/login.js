@@ -1,194 +1,193 @@
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { Link } from "expo-router";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
+  useColorScheme,
 } from "react-native";
 import { supabase } from "../../src/lib/supabase";
+import { THEME_COLORS, useHabitStore } from "../../src/store/useHabitStore";
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const { t } = useTranslation();
+  const colorScheme = useColorScheme();
+
+  const appTheme = useHabitStore((s) => s.appTheme);
+  const activeTheme = appTheme === "system" ? colorScheme || "dark" : appTheme;
+  const colors = THEME_COLORS[activeTheme];
+  const styles = useMemo(() => getDynamicStyles(colors), [colors]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ Supabase ile giriş yap
-  async function handleLogin() {
-    if (!email || !password) {
-      Alert.alert("Hata", "Email ve şifre boş olamaz.");
-      return;
-    }
-
+  async function signInWithEmail() {
+    if (!email || !password) return;
     setLoading(true);
-
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password,
+      email,
+      password,
     });
-
-    if (error) {
-      Alert.alert("Giriş Hatası", error.message);
-    }
-    // Hata yoksa _layout.js otomatik ana ekrana yönlendirir
-
+    if (error) Alert.alert(t("error"), error.message);
     setLoading(false);
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View style={styles.inner}>
-        {/* Logo / Başlık */}
-        <View style={styles.header}>
-          <Text style={styles.emoji}>⚡</Text>
-          <Text style={styles.title}>HabitFlow</Text>
-          <Text style={styles.subtitle}>
-            Alışkanlıklarını yönet, hayatını değiştir.
-          </Text>
-        </View>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <View style={styles.iconBox}>
+                <Text style={styles.iconText}>⚡</Text>
+              </View>
+              <Text style={styles.title}>{t("loginTitle")}</Text>
+              <Text style={styles.subtitle}>{t("loginSub")}</Text>
+            </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ornek@email.com"
-            placeholderTextColor="#444"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+            <View style={styles.form}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder={t("emailPlace")}
+                placeholderTextColor={colors.textSubtle}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
 
-          <Text style={styles.label}>Şifre</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="••••••••"
-            placeholderTextColor="#444"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+              <Text style={styles.label}>
+                {t("passPlace")
+                  .replace("Your password", "Password")
+                  .replace("Tu contraseña", "Contraseña")
+                  .replace("Şifren", "Şifre")}
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSubtle}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
 
-          {/* Şifremi unuttum */}
-          <TouchableOpacity
-            style={styles.forgotButton}
-            onPress={() => router.push("/(auth)/reset-password")}
-          >
-            <Text style={styles.forgotText}>Şifremi unuttum</Text>
-          </TouchableOpacity>
+              <View style={styles.forgotPassRow}>
+                {/* ✅ HATANIN ÇÖZÜLDÜĞÜ YER: Rota reset-password olarak düzeltildi */}
+                <Link href="/(auth)/reset-password" asChild>
+                  <TouchableOpacity>
+                    <Text style={styles.forgotPassText}>{t("forgotPass")}</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
 
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Giriş Yap</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={signInWithEmail}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>{t("loginBtn")}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
 
-        {/* Kayıt ol linki */}
-        <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-          <Text style={styles.link}>
-            Hesabın yok mu? <Text style={styles.linkBold}>Kayıt Ol</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+            <View style={styles.footer}>
+              <Link href="/(auth)/register" asChild>
+                <TouchableOpacity>
+                  <Text style={styles.footerText}>{t("registerLink")}</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0f0f0f",
-  },
-  inner: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 28,
-    gap: 32,
-  },
-  header: {
-    alignItems: "center",
-    gap: 8,
-  },
-  emoji: {
-    fontSize: 52,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#ffffff",
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#555",
-    textAlign: "center",
-  },
-  form: {
-    gap: 10,
-  },
-  label: {
-    color: "#888",
-    fontSize: 13,
-    marginBottom: 2,
-    marginLeft: 4,
-  },
-  input: {
-    backgroundColor: "#1a1a1a",
-    color: "#fff",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: "#2a2a2a",
-    marginBottom: 8,
-  },
-  button: {
-    backgroundColor: "#6366f1",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  link: {
-    color: "#555",
-    textAlign: "center",
-    fontSize: 14,
-  },
-  linkBold: {
-    color: "#6366f1",
-    fontWeight: "bold",
-  },
-  forgotButton: {
-    alignSelf: "flex-end",
-    marginTop: -4,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  forgotText: { color: "#6366f1", fontSize: 13 },
-});
+const getDynamicStyles = (colors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    container: { flex: 1, paddingHorizontal: 24, justifyContent: "center" },
+    header: { alignItems: "center", marginBottom: 40 },
+    iconBox: {
+      width: 72,
+      height: 72,
+      borderRadius: 20,
+      backgroundColor: colors.primary + "1A",
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.primary + "33",
+    },
+    iconText: { fontSize: 36 },
+    title: {
+      color: colors.text,
+      fontSize: 32,
+      fontWeight: "900",
+      letterSpacing: -1,
+      marginBottom: 8,
+    },
+    subtitle: { color: colors.textSubtle, fontSize: 16, fontWeight: "500" },
+    form: { width: "100%" },
+    label: {
+      color: colors.textMuted,
+      fontSize: 13,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    input: {
+      backgroundColor: colors.inputBg,
+      color: colors.text,
+      borderRadius: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 20,
+      fontWeight: "500",
+    },
+    forgotPassRow: { alignItems: "flex-end", marginBottom: 30, marginTop: -8 },
+    forgotPassText: { color: colors.primary, fontSize: 14, fontWeight: "700" },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      paddingVertical: 20,
+      alignItems: "center",
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    buttonText: {
+      color: "#FFFFFF",
+      fontSize: 18,
+      fontWeight: "800",
+      letterSpacing: 0.5,
+    },
+    footer: { marginTop: 40, alignItems: "center" },
+    footerText: { color: colors.textSubtle, fontSize: 15, fontWeight: "600" },
+  });

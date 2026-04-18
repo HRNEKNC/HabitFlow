@@ -8,9 +8,9 @@
     "userInterfaceStyle": "dark",
     "icon": "./assets/images/icon.png",
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/splashhrn.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f0f0f"
+      "backgroundColor": "#0A0A0A"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
@@ -53,7 +53,9 @@
           "color": "#6366f1",
           "androidMode": "default"
         }
-      ]
+      ],
+      "expo-localization",
+      "expo-font"
     ],
     "extra": {
       "eas": {

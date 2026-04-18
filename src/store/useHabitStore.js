@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { checkAndAwardBadges } from "../lib/badgeChecker";
 import {
@@ -6,9 +7,44 @@ import {
 } from "../lib/notifications";
 import { supabase } from "../lib/supabase";
 
-// ✅ Dinamik Tarih Fonksiyonu (Gece Yarısı Bug'ını önler)
+export const THEME_COLORS = {
+  dark: {
+    background: "#0A0A0A",
+    card: "#171717",
+    text: "#FAFAFA",
+    textMuted: "#A3A3A3",
+    textSubtle: "#737373",
+    border: "#262626",
+    primary: "#F5A623",
+    accent: "#D97706",
+    success: "#10B981",
+    danger: "#EF4444",
+    modalBg: "#171717",
+    inputBg: "#262626",
+  },
+  light: {
+    background: "#F4F4F5",
+    card: "#FFFFFF",
+    text: "#171717",
+    textMuted: "#525252",
+    textSubtle: "#A3A3A3",
+    border: "#E5E5E5",
+    primary: "#F5A623",
+    accent: "#D97706",
+    success: "#059669",
+    danger: "#DC2626",
+    modalBg: "#FFFFFF",
+    inputBg: "#F4F4F5",
+  },
+};
+
 function getToday() {
   return new Date().toISOString().split("T")[0];
+}
+function getYesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
 }
 
 export const useHabitStore = create((set, get) => ({
@@ -24,65 +60,82 @@ export const useHabitStore = create((set, get) => ({
   loading: true,
   refreshing: false,
   weekStartStr: null,
+  appTheme: "system",
+  energy: 0,
+  freezes: 0,
+
+  // ✅ YENİ: Başlangıçta dil seçimi yapıldı mı kontrolü
+  isLangSelected: true,
+  setLangSelected: () => set({ isLangSelected: true }),
 
   init: async () => {
+    try {
+      const storedTheme = await AsyncStorage.getItem("appTheme");
+      if (storedTheme) set({ appTheme: storedTheme });
+
+      // Dil seçimi yapılmış mı kontrol et
+      const storedLang = await AsyncStorage.getItem("settings.lang");
+      if (!storedLang) set({ isLangSelected: false });
+    } catch (e) {}
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) return;
-    set({ userId: session.user.id, user: session.user });
+    set({
+      userId: session.user.id,
+      user: session.user,
+      energy: session.user.user_metadata?.energy || 0,
+      freezes: session.user.user_metadata?.freezes || 0,
+    });
     await get().fetchAll();
+  },
+
+  setAppTheme: async (newTheme) => {
+    set({ appTheme: newTheme });
+    try {
+      await AsyncStorage.setItem("appTheme", newTheme);
+    } catch (e) {}
   },
 
   fetchAll: async () => {
     const { userId } = get();
     if (!userId) return;
     set({ loading: true });
-
     try {
-      const today = getToday(); // ✅ Dinamik
+      const today = getToday();
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
       weekStart.setHours(0, 0, 0, 0);
       const weekStartStr = weekStart.toISOString().split("T")[0];
       set({ weekStartStr });
 
-      const { data: habitsData, error: habitsError } = await supabase
+      const { data: habitsData } = await supabase
         .from("habits")
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: true });
-      if (habitsError) throw habitsError;
-
-      const { data: todayLogsData, error: todayError } = await supabase
+      const { data: todayLogsData } = await supabase
         .from("habit_logs")
         .select("habit_id")
         .eq("user_id", userId)
         .eq("completed_date", today);
-      if (todayError) throw todayError;
-
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const startStr = thirtyDaysAgo.toISOString().split("T")[0];
-      const { data: allLogsData, error: allLogsError } = await supabase
+      const { data: allLogsData } = await supabase
         .from("habit_logs")
         .select("*")
         .eq("user_id", userId)
         .gte("completed_date", startStr);
-      if (allLogsError) throw allLogsError;
-
       const { count: totalLogsCount } = await supabase
         .from("habit_logs")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId);
-      const todayCount = todayLogsData?.length || 0;
-
-      const { data: badgesData, error: badgesError } = await supabase
+      const { data: badgesData } = await supabase
         .from("user_badges")
         .select(`earned_at, badges ( id, title, description, icon, color )`)
         .eq("user_id", userId)
         .order("earned_at", { ascending: false });
-      if (badgesError) throw badgesError;
 
       set({
         habits: habitsData || [],
@@ -94,11 +147,10 @@ export const useHabitStore = create((set, get) => ({
         stats: {
           habits: habitsData?.length || 0,
           totalLogs: totalLogsCount || 0,
-          todayLogs: todayCount,
+          todayLogs: todayLogsData?.length || 0,
         },
       });
     } catch (err) {
-      console.error("fetchAll hatası:", err.message);
     } finally {
       set({ loading: false, refreshing: false });
     }
@@ -134,14 +186,13 @@ export const useHabitStore = create((set, get) => ({
       .select()
       .single();
     if (error) throw error;
-    if (notify_hour !== null && notify_minute !== null) {
+    if (notify_hour !== null && notify_minute !== null)
       await scheduleDailyNotification({
         habitId: data.id,
         title,
         hour: notify_hour,
         minute: notify_minute,
       });
-    }
     await fetchAll();
   },
 
@@ -169,83 +220,149 @@ export const useHabitStore = create((set, get) => ({
       })
       .eq("id", id);
     if (error) throw error;
-    if (notify_hour !== null && notify_minute !== null) {
+    if (notify_hour !== null && notify_minute !== null)
       await scheduleDailyNotification({
         habitId: id,
         title,
         hour: notify_hour,
         minute: notify_minute,
       });
-    } else {
-      await cancelHabitNotification(id);
-    }
+    else await cancelHabitNotification(id);
     await fetchAll();
   },
 
   deleteHabit: async (habitId) => {
     const { fetchAll } = get();
     await cancelHabitNotification(habitId);
-    const { error } = await supabase.from("habits").delete().eq("id", habitId);
-    if (error) throw error;
+    await supabase.from("habits").delete().eq("id", habitId);
     await fetchAll();
   },
 
   toggleHabit: async (habitId) => {
-    const { userId, logs, habits, allLogs } = get();
-    const today = getToday(); // ✅ Dinamik
+    const {
+      userId,
+      logs,
+      habits,
+      allLogs,
+      fetchAll,
+      energy,
+      updateProfileData,
+    } = get();
+    const today = getToday();
     const isCompleted = logs.includes(habitId);
-
     if (isCompleted) {
-      const { error } = await supabase
-        .from("habit_logs")
-        .delete()
-        .eq("habit_id", habitId)
-        .eq("user_id", userId)
-        .eq("completed_date", today);
-      if (error) throw error;
-
+      const newEnergy = Math.max(0, energy - 10);
       set((state) => ({
         logs: state.logs.filter((id) => id !== habitId),
         allLogs: state.allLogs.filter(
           (l) => !(l.habit_id === habitId && l.completed_date === today),
         ),
-        stats: { ...state.stats, todayLogs: state.stats.todayLogs - 1 },
+        stats: {
+          ...state.stats,
+          todayLogs: Math.max(0, state.stats.todayLogs - 1),
+        },
+        energy: newEnergy,
       }));
+      updateProfileData({ energy: newEnergy });
+      try {
+        await supabase
+          .from("habit_logs")
+          .delete()
+          .eq("habit_id", habitId)
+          .eq("user_id", userId)
+          .eq("completed_date", today);
+      } catch (error) {
+        fetchAll();
+      }
     } else {
-      const { error } = await supabase
-        .from("habit_logs")
-        .insert({ habit_id: habitId, user_id: userId, completed_date: today });
-      if (error) throw error;
-
+      const newEnergy = energy + 10;
       const newAllLogs = [
         ...allLogs,
         { habit_id: habitId, user_id: userId, completed_date: today },
       ];
-
       set((state) => ({
         logs: [...state.logs, habitId],
         allLogs: newAllLogs,
         stats: { ...state.stats, todayLogs: state.stats.todayLogs + 1 },
+        energy: newEnergy,
       }));
-
-      await checkAndAwardBadges({
-        userId,
-        habits,
-        allLogs: newAllLogs,
-        logs: [...logs, habitId],
-      });
-      await get().fetchAll();
+      updateProfileData({ energy: newEnergy });
+      try {
+        await supabase.from("habit_logs").insert({
+          habit_id: habitId,
+          user_id: userId,
+          completed_date: today,
+        });
+        checkAndAwardBadges({
+          userId,
+          habits,
+          allLogs: newAllLogs,
+          logs: [...logs, habitId],
+        }).then(() => {
+          supabase
+            .from("user_badges")
+            .select(`earned_at, badges ( id, title, description, icon, color )`)
+            .eq("user_id", userId)
+            .order("earned_at", { ascending: false })
+            .then(({ data }) => {
+              if (data)
+                set({
+                  userBadges: data.map((b) => ({
+                    ...b.badges,
+                    earned_at: b.earned_at,
+                  })),
+                });
+            });
+        });
+      } catch (error) {
+        fetchAll();
+      }
     }
   },
 
-  // ✅ YENİ: Hesabı Sil
+  buyFreeze: async () => {
+    const { energy, freezes, updateProfileData } = get();
+    if (energy >= 100) {
+      const newEnergy = energy - 100;
+      const newFreezes = freezes + 1;
+      set({ energy: newEnergy, freezes: newFreezes });
+      await updateProfileData({ energy: newEnergy, freezes: newFreezes });
+      return true;
+    }
+    return false;
+  },
+
+  useFreezeForYesterday: async (habitId) => {
+    const { userId, freezes, allLogs, fetchAll, updateProfileData } = get();
+    if (freezes < 1) return false;
+    const yesterday = getYesterday();
+    const newFreezes = freezes - 1;
+    set({
+      freezes: newFreezes,
+      allLogs: [
+        ...allLogs,
+        { habit_id: habitId, user_id: userId, completed_date: yesterday },
+      ],
+    });
+    updateProfileData({ freezes: newFreezes });
+    try {
+      await supabase.from("habit_logs").insert({
+        habit_id: habitId,
+        user_id: userId,
+        completed_date: yesterday,
+      });
+      await fetchAll();
+      return true;
+    } catch (e) {
+      fetchAll();
+      return false;
+    }
+  },
+
   deleteAccount: async () => {
     const { cancelAllNotifications } = await import("../lib/notifications");
     await cancelAllNotifications();
-
-    const { error } = await supabase.rpc("delete_user_account");
-    if (error) throw error;
-
+    await supabase.rpc("delete_user_account");
     set({
       userId: null,
       user: null,
@@ -254,18 +371,14 @@ export const useHabitStore = create((set, get) => ({
       allLogs: [],
       stats: { habits: 0, totalLogs: 0, todayLogs: 0 },
       userBadges: [],
+      energy: 0,
+      freezes: 0,
     });
     await supabase.auth.signOut();
   },
-  // ✅ YENİ: Kullanıcı Adı Güncelleme
-  updateUsername: async (newUsername) => {
-    // Supabase Auth meta verisini güncelle
-    const { error } = await supabase.auth.updateUser({
-      data: { username: newUsername },
-    });
-    if (error) throw error;
 
-    // Local state'i hemen güncelle ki UI anında değişsin
+  updateProfileData: async (dataToUpdate) => {
+    await supabase.auth.updateUser({ data: dataToUpdate });
     const {
       data: { session },
     } = await supabase.auth.getSession();
