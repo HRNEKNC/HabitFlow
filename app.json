@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "bundleIdentifier": "com.hrnsoftware.habitflow",
       "buildNumber": "1",
@@ -43,7 +45,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0f0f0f"
       },
-      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"]
+      "permissions": [
+        "NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
     },
     "plugins": [
       [
@@ -55,7 +61,8 @@
         }
       ],
       "expo-localization",
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {

@@ -1,3 +1,4 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useMemo, useState } from "react";
@@ -72,6 +73,7 @@ export default function HomeScreen() {
   const [editingHabit, setEditingHabit] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   function getUsername() {
     const metaName = user?.user_metadata?.username;
@@ -551,17 +553,19 @@ export default function HomeScreen() {
                     ))}
                   </View>
 
-                  {/* ✅ YUVAYA DÖNEN EFSANEVİ SAAT SEÇİCİ */}
+                  {/* ✅ NATIVE KAYDIRMALI SAAT SEÇİCİ */}
                   <Text style={styles.modalLabel}>{t("notifyTime")}</Text>
                   <TouchableOpacity
                     style={styles.notifyToggle}
-                    onPress={() =>
+                    onPress={() => {
+                      const isOn = form.notify_hour !== null;
                       setForm((f) => ({
                         ...f,
-                        notify_hour: f.notify_hour === null ? 9 : null,
-                        notify_minute: f.notify_minute === null ? 0 : null,
-                      }))
-                    }
+                        notify_hour: isOn ? null : 9,
+                        notify_minute: isOn ? null : 0,
+                      }));
+                      if (!isOn) setShowTimePicker(true);
+                    }}
                   >
                     <View style={styles.notifyToggleLeft}>
                       <Ionicons
@@ -594,79 +598,85 @@ export default function HomeScreen() {
 
                   {form.notify_hour !== null && (
                     <>
-                      <View style={styles.timePickerRow}>
-                        <View style={styles.timePickerBox}>
-                          <TouchableOpacity
-                            style={styles.timeArrow}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                notify_hour: (f.notify_hour + 1) % 24,
-                              }))
-                            }
-                          >
-                            <Ionicons
-                              name="chevron-up"
-                              size={24}
-                              color={colors.primary}
+                      <TouchableOpacity
+                        style={styles.timeDisplayBtn}
+                        onPress={() => setShowTimePicker(true)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={22}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.timeDisplayText}>
+                          {String(form.notify_hour).padStart(2, "0")}:{String(form.notify_minute).padStart(2, "0")}
+                        </Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={18}
+                          color={colors.textSubtle}
+                        />
+                      </TouchableOpacity>
+
+                      {/* iOS: Inline spinner, Android: Modal picker */}
+                      {Platform.OS === "ios" ? (
+                        showTimePicker && (
+                          <View style={styles.iosPickerWrapper}>
+                            <DateTimePicker
+                              value={(() => {
+                                const d = new Date();
+                                d.setHours(form.notify_hour, form.notify_minute, 0, 0);
+                                return d;
+                              })()}
+                              mode="time"
+                              display="spinner"
+                              is24Hour={true}
+                              locale="tr-TR"
+                              textColor={colors.text}
+                              themeVariant={activeTheme}
+                              onChange={(_, selected) => {
+                                if (selected) {
+                                  setForm((f) => ({
+                                    ...f,
+                                    notify_hour: selected.getHours(),
+                                    notify_minute: selected.getMinutes(),
+                                  }));
+                                }
+                              }}
                             />
-                          </TouchableOpacity>
-                          <Text style={styles.timeValue}>
-                            {String(form.notify_hour).padStart(2, "0")}
-                          </Text>
-                          <TouchableOpacity
-                            style={styles.timeArrow}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                notify_hour: (f.notify_hour + 23) % 24,
-                              }))
-                            }
-                          >
-                            <Ionicons
-                              name="chevron-down"
-                              size={24}
-                              color={colors.primary}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                        <Text style={styles.timeSeparator}>:</Text>
-                        <View style={styles.timePickerBox}>
-                          <TouchableOpacity
-                            style={styles.timeArrow}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                notify_minute: (f.notify_minute + 1) % 60,
-                              }))
-                            }
-                          >
-                            <Ionicons
-                              name="chevron-up"
-                              size={24}
-                              color={colors.primary}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.timeValue}>
-                            {String(form.notify_minute).padStart(2, "0")}
-                          </Text>
-                          <TouchableOpacity
-                            style={styles.timeArrow}
-                            onPress={() =>
-                              setForm((f) => ({
-                                ...f,
-                                notify_minute: (f.notify_minute + 59) % 60,
-                              }))
-                            }
-                          >
-                            <Ionicons
-                              name="chevron-down"
-                              size={24}
-                              color={colors.primary}
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                            <TouchableOpacity
+                              style={styles.iosPickerDone}
+                              onPress={() => setShowTimePicker(false)}
+                            >
+                              <Text style={styles.iosPickerDoneText}>Tamam</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )
+                      ) : (
+                        showTimePicker && (
+                          <DateTimePicker
+                            value={(() => {
+                              const d = new Date();
+                              d.setHours(form.notify_hour, form.notify_minute, 0, 0);
+                              return d;
+                            })()}
+                            mode="time"
+                            display="spinner"
+                            is24Hour={true}
+                            onChange={(event, selected) => {
+                              setShowTimePicker(false);
+                              if (selected && event.type !== "dismissed") {
+                                setForm((f) => ({
+                                  ...f,
+                                  notify_hour: selected.getHours(),
+                                  notify_minute: selected.getMinutes(),
+                                }));
+                              }
+                            }}
+                          />
+                        )
+                      )}
+
                       <Text style={styles.timeRemainingText}>
                         {getTimeRemainingText()}
                       </Text>
@@ -904,8 +914,9 @@ const getDynamicStyles = (colors) =>
       borderTopRightRadius: 32,
       padding: 28,
       paddingBottom: Platform.OS === "ios" ? 48 : 28,
-      maxHeight: "90%",
+      maxHeight: "92%",
       width: "100%",
+      flexShrink: 1,
     },
     modalDragIndicator: {
       width: 40,
@@ -1097,39 +1108,50 @@ const getDynamicStyles = (colors) =>
       backgroundColor: colors.textMuted,
     },
     toggleDotActive: { backgroundColor: "#fff", alignSelf: "flex-end" },
-    timePickerRow: {
+    timeDisplayBtn: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 16,
+      gap: 12,
       backgroundColor: colors.inputBg,
       borderRadius: 16,
-      paddingVertical: 16,
-      marginBottom: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.primary + "44",
+    },
+    timeDisplayText: {
+      flex: 1,
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: "800",
+      letterSpacing: 1,
+    },
+    iosPickerWrapper: {
+      backgroundColor: colors.inputBg,
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
-    },
-    timePickerBox: { alignItems: "center", gap: 8 },
-    timeArrow: { padding: 4 },
-    timeValue: {
-      color: colors.text,
-      fontSize: 36,
-      fontWeight: "800",
-      minWidth: 70,
-      textAlign: "center",
-    },
-    timeSeparator: {
-      color: colors.textMuted,
-      fontSize: 36,
-      fontWeight: "800",
       marginBottom: 8,
+      overflow: "hidden",
+    },
+    iosPickerDone: {
+      alignItems: "center",
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    iosPickerDoneText: {
+      color: colors.primary,
+      fontSize: 16,
+      fontWeight: "700",
     },
     timeRemainingText: {
       color: colors.success,
       fontSize: 13,
       textAlign: "center",
       marginBottom: 16,
-      marginTop: -4,
+      marginTop: 4,
       fontWeight: "500",
     },
   });

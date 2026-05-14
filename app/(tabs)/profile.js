@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -60,6 +61,7 @@ const LANG_OPTIONS = [
 
 export default function ProfileScreen() {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
   const colorScheme = useColorScheme();
 
   const deleteAccount = useHabitStore((s) => s.deleteAccount);
@@ -424,6 +426,25 @@ export default function ProfileScreen() {
             />
             <View style={styles.divider} />
             <InfoRow icon="layers-outline" label={t("version")} value="1.0.1" />
+            <View style={styles.divider} />
+            <TouchableOpacity
+              onPress={() => router.push("/privacy")}
+              activeOpacity={0.7}
+              style={styles.rowClickable}
+            >
+              <View style={{ flex: 1 }}>
+                <InfoRow
+                  icon="shield-checkmark-outline"
+                  label="Gizlilik ve Etik"
+                  value="UNESCO Uyumlu"
+                />
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textSubtle}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 

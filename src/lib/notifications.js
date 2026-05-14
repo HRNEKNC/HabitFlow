@@ -71,9 +71,7 @@ export async function scheduleDailyNotification({
       // Eski sürümde channelId buradaydı, artık değil!
     },
     trigger: {
-      // ✅ YENİ EXPO KURALI: channelId artık trigger'ın içinde olmak zorunda
       channelId: "habitflow",
-      type: "daily", // Expo'ya bunun günlük bir tetikleyici olduğunu kesin olarak belirtiyoruz
       hour: Number(hour),
       minute: Number(minute),
       repeats: true,
